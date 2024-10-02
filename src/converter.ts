@@ -131,22 +131,29 @@ export const convertLinksInActiveFile = async (plugin: LinkConverterPlugin, fina
 export const convertLinksUnderFolder = async (folder: TFolder, plugin: LinkConverterPlugin, finalFormat: 'markdown' | 'wiki') => {
     let mdFiles: TFile[] = getFilesUnderPath(folder.path, plugin);
     let notice = new Notice('Starting link conversion', 0);
+    let errors = [];
     try {
         let totalCount = mdFiles.length;
         let counter = 0;
         for (let mdFile of mdFiles) {
-            counter++;
-            notice.setMessage(`Converting the links in notes ${counter}/${totalCount}.`);
-            // --> Skip Excalidraw and Kanban Files
-            if (hasFrontmatter(plugin.app, mdFile.path, 'excalidraw-plugin') || hasFrontmatter(plugin.app, mdFile.path, 'kanban-plugin')) {
-                continue;
+            try {
+                counter++;
+                notice.setMessage(`Converting the links in notes ${counter}/${totalCount}.`);
+                // --> Skip Excalidraw and Kanban Files
+                if (hasFrontmatter(plugin.app, mdFile.path, 'excalidraw-plugin') || hasFrontmatter(plugin.app, mdFile.path, 'kanban-plugin')) {
+                    continue;
+                }
+                await convertLinksAndSaveInSingleFile(mdFile, plugin, finalFormat);
+            } catch (error) {
+                errors.push({ file: mdFile, error });
             }
-            await convertLinksAndSaveInSingleFile(mdFile, plugin, finalFormat);
         }
     } catch (err) {
         console.log(err);
     } finally {
         notice.hide();
+        console.log(errors);
+        new Notice('error file:' + errors.length);
     }
 };
 
@@ -313,12 +320,12 @@ const createLink = (dest: LinkType, originalLink: string, altOrBlockRef: string,
 
 /**
  * Encode URI the same way Obsidian is doing it internally
- * 
- * @param uri 
- * @returns 
+ *
+ * @param uri
+ * @returns
  */
 function customEncodeURI(uri: string): string {
-    return uri.replace(/[\\\x00\x08\x0B\x0C\x0E-\x1F ]/g, urlPart => encodeURIComponent(urlPart));
+    return uri.replace(/[\\\x00\x08\x0B\x0C\x0E-\x1F ]/g, (urlPart) => encodeURIComponent(urlPart));
 }
 
 /**
